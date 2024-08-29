@@ -8,7 +8,7 @@
 #define MAX_NAME_LENGTH 50
 #define MAX_EMAIL_LENGTH 100
 #define MAX_PHONE_LENGTH 12
-#define MAX_PASSWORD_LENGTH 20
+#define MAX_PASSWORD_LENGTH 50
 #define MAX_ID_LENGTH 10
 #define MAX_USERS 100
 #define MAX_ORDERS 100
@@ -117,13 +117,24 @@ unsigned int hashFunction(const char* key, int tableSize) {
 // 初始化哈希表
 HashTable* initHashTable(int size) {
     HashTable* hashTable = (HashTable*)malloc(sizeof(HashTable));
+    if (!hashTable) {  // 检查内存分配是否成功
+        printf("Error: Unable to allocate memory for hash table.\n");
+        exit(1);  // 退出程序
+    }
+
     hashTable->size = size;
     hashTable->table = (HashTableEntry**)malloc(sizeof(HashTableEntry*) * size);
+    if (!hashTable->table) {  // 检查内存分配是否成功
+        printf("Error: Unable to allocate memory for hash table entries.\n");
+        exit(1);  // 退出程序
+    }
+
     for (int i = 0; i < size; i++) {
         hashTable->table[i] = NULL;
     }
     return hashTable;
 }
+
 
 // 简单哈希函数
 void simpleHash(const char* input, char* outputHash) {
@@ -147,29 +158,59 @@ void simpleEncrypt(const unsigned char* data, unsigned char* encryptedData, cons
 void addUser(User user) {
     unsigned int hashIndex = hashFunction(user.userID, usersTable->size);
     HashTableEntry* newEntry = (HashTableEntry*)malloc(sizeof(HashTableEntry));
+    if (!newEntry) {  // 检查内存分配是否成功
+        printf("Error: Unable to allocate memory for hash table entry.\n");
+        exit(1);
+    }
+
     strcpy_s(newEntry->key, sizeof(newEntry->key), user.userID);
     newEntry->value = malloc(sizeof(User));
+    if (!newEntry->value) {  // 检查内存分配是否成功
+        printf("Error: Unable to allocate memory for user data.\n");
+        free(newEntry);
+        exit(1);
+    }
     memcpy(newEntry->value, &user, sizeof(User));
     newEntry->next = usersTable->table[hashIndex];
     usersTable->table[hashIndex] = newEntry;
 }
 
+
 // 添加管理员
 void addAdmin(Admin admin) {
     unsigned int hashIndex = hashFunction(admin.adminID, adminsTable->size);
     HashTableEntry* newEntry = (HashTableEntry*)malloc(sizeof(HashTableEntry));
+
+    // 检查malloc是否成功
+    if (newEntry == NULL) {
+        printf("Error: Memory allocation failed.\n");
+        return;
+    }
+
     strcpy_s(newEntry->key, sizeof(newEntry->key), admin.adminID);
     newEntry->value = malloc(sizeof(Admin));
+
+    // 检查malloc是否成功
+    if (newEntry->value == NULL) {
+        printf("Error: Memory allocation failed for admin value.\n");
+        free(newEntry);  // 清理先前分配的内存
+        return;
+    }
+
     memcpy(newEntry->value, &admin, sizeof(Admin));
     newEntry->next = adminsTable->table[hashIndex];
     adminsTable->table[hashIndex] = newEntry;
 }
 
+
 // 注册用户
 void registerUser() {
     User user;
-    printf("Enter User ID: ");
-    scanf("%s", user.userID);
+    memset(&user, 0, sizeof(User));  // 初始化user所有成员为0
+
+    printf("Enter User ID (only letters and digits, max 9 chars): ");
+    scanf("%9s", user.userID);
+
     // 检查 User ID 是否只包含字母和数字
     for (int i = 0; i < strlen(user.userID); i++) {
         if (!isalnum(user.userID[i])) {
@@ -196,17 +237,23 @@ void registerUser() {
         }
     }
     printf("Enter Email: ");
-    scanf("%s", user.email);
-    printf("Enter Password: ");
-    char password[MAX_PASSWORD_LENGTH];
-    scanf("%s", password);
-    // 检查密码是否只包含字母和数字
-    for (int i = 0; i < strlen(password); i++) {
-        if (!isalnum(password[i])) {
-            printf("Error: Password must contain only letters and digits.\n");
-            return;
-        }
+scanf("%s", user.email);  // 这个 scanf 需要注意缓冲区溢出
+
+printf("Enter Password: ");
+char password[50];  // 确保密码缓冲区足够大
+
+// 使用 scanf_s 并传入缓冲区大小
+scanf("%49s", password);
+
+// 遍历 password 中的字符，检查是否为字母或数字
+for (int i = 0; i < strlen(password); i++) {
+    if (!isalnum((unsigned char)password[i])) {
+        printf("Error: Password must contain only letters and digits.\n");
+        return;
     }
+}
+
+
     simpleHash(password, user.passwordHash);
     user.accountBalance = 0.0f;
     addUser(user);
@@ -223,7 +270,7 @@ void loginUser() {
     scanf("%s", password);
     char hashedPassword[MAX_PASSWORD_LENGTH];
     simpleHash(password, hashedPassword);
-    
+
     unsigned int hashIndex = hashFunction(userID, usersTable->size);
     HashTableEntry* entry = usersTable->table[hashIndex];
     while (entry) {
@@ -232,7 +279,8 @@ void loginUser() {
             if (strcmp(user->passwordHash, hashedPassword) == 0) {
                 printf("Login successful! Welcome, %s.\n", user->name);
                 return;
-            } else {
+            }
+            else {
                 printf("Error: Incorrect password.\n");
                 return;
             }
@@ -250,7 +298,7 @@ void rechargeUser() {
     scanf("%s", userID);
     printf("Enter amount to recharge: ");
     scanf("%f", &amount);
-    
+
     unsigned int hashIndex = hashFunction(userID, usersTable->size);
     HashTableEntry* entry = usersTable->table[hashIndex];
     while (entry) {
@@ -275,7 +323,7 @@ void adminLogin() {
     scanf("%s", password);
     char hashedPassword[MAX_PASSWORD_LENGTH];
     simpleHash(password, hashedPassword);
-    
+
     unsigned int hashIndex = hashFunction(adminID, adminsTable->size);
     HashTableEntry* entry = adminsTable->table[hashIndex];
     while (entry) {
@@ -284,7 +332,8 @@ void adminLogin() {
             if (strcmp(admin->passwordHash, hashedPassword) == 0) {
                 printf("Admin login successful! Welcome, %s.\n", admin->name);
                 return;
-            } else {
+            }
+            else {
                 printf("Error: Incorrect password.\n");
                 return;
             }
@@ -340,24 +389,24 @@ int main() {
         scanf("%d", &choice);
 
         switch (choice) {
-            case 1:
-                registerUser();
-                break;
-            case 2:
-                loginUser();
-                break;
-            case 3:
-                rechargeUser();
-                break;
-            case 4:
-                adminLogin();
-                break;
-            case 5:
-                saveUserDataToFile(); // 退出前保存用户数据到文件
-                printf("Exiting...\n");
-                break;
-            default:
-                printf("Invalid choice!\n");
+        case 1:
+            registerUser();
+            break;
+        case 2:
+            loginUser();
+            break;
+        case 3:
+            rechargeUser();
+            break;
+        case 4:
+            adminLogin();
+            break;
+        case 5:
+            saveUserDataToFile(); // 退出前保存用户数据到文件
+            printf("Exiting...\n");
+            break;
+        default:
+            printf("Invalid choice!\n");
         }
     } while (choice != 5);
 
